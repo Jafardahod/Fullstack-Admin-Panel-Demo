@@ -1,5 +1,5 @@
 // frontend/src/pages/UserMasterPage.js
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -7,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Avatar,
   Grid,
   IconButton,
   MenuItem,
@@ -16,11 +17,15 @@ import {
   Select,
   InputLabel,
   FormControl,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { Edit, Delete } from "@mui/icons-material";
 import { userApi } from "../api/userApi";
 import { Country, State, City } from "country-state-city";
 import { validateUserForm } from "../utils/validation";
+
+const thumbnail = "/mnt/data/a04fb529-dace-41cc-9324-c196588840b9.png";
 
 const emptyForm = {
   userId: "",
@@ -29,9 +34,9 @@ const emptyForm = {
   email: "",
   countryCode: "+91",
   mobile: "",
-  country: "", // ISO2, e.g. "IN"
-  state: "",   // state ISO, e.g. "MH"
-  city: "",    // city name
+  country: "", // ISO2
+  state: "", // state ISO
+  city: "", // city name
   address: "",
   pincode: "",
   password: "",
@@ -43,25 +48,29 @@ const UserMasterPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
+  const [successOpen, setSuccessOpen] = useState(false);
 
+  // meta lists
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [countryCodes, setCountryCodes] = useState([]);
 
   const loadUsers = async () => {
-    const list = await userApi.getAll();
-    setUsers(list);
+    try {
+      const list = await userApi.getAll();
+      setUsers(list);
+    } catch (err) {
+      console.error("Failed to load users", err);
+    }
   };
 
   useEffect(() => {
     loadUsers();
-  }, []);
 
-  // load country data once
-  useEffect(() => {
+    // load country/state/city once
     const cList = Country.getAllCountries();
-    setCountries(cList);
+    setCountries(cList || []);
 
     const codes = cList
       .filter((c) => !!c.phonecode)
@@ -69,16 +78,16 @@ const UserMasterPage = () => {
         value: `+${c.phonecode}`,
         label: `${c.name} (+${c.phonecode})`,
       }))
-      // remove duplicates by value
       .filter(
         (item, index, arr) =>
           arr.findIndex((x) => x.value === item.value) === index
       );
+
     setCountryCodes(codes);
   }, []);
 
   const handleCountryChange = (isoCode) => {
-    const countryStates = State.getStatesOfCountry(isoCode);
+    const countryStates = State.getStatesOfCountry(isoCode) || [];
     setStates(countryStates);
     setCities([]);
     setForm((prev) => ({ ...prev, country: isoCode, state: "", city: "" }));
@@ -86,7 +95,7 @@ const UserMasterPage = () => {
   };
 
   const handleStateChange = (stateIso) => {
-    const cityList = City.getCitiesOfState(form.country, stateIso);
+    const cityList = City.getCitiesOfState(form.country, stateIso) || [];
     setCities(cityList);
     setForm((prev) => ({ ...prev, state: stateIso, city: "" }));
     setErrors((prev) => ({ ...prev, state: "", city: "" }));
@@ -113,28 +122,52 @@ const UserMasterPage = () => {
   };
 
   const openEdit = (user) => {
-    // here we only have stored text values in DB,
-    // so we just prefill the text fields; dropdowns can stay empty if iso codes not stored.
-    setForm((prev) => ({
-      ...prev,
+    setForm({
       userId: user.user_id,
       username: user.username,
       fullName: user.full_name,
       email: user.email,
-      countryCode: "+91", // or parse from user.mobile if you stored it
-      mobile: (user.mobile || "").replace(/^\+\d+\s?/, ""),
-      country: "", // cannot recover ISO from DB text; user can re-select if needed
-      state: "",
+      countryCode:
+        user.mobile && user.mobile.startsWith("+")
+          ? user.mobile.replace(/^(\+\d+).*/, "$1")
+          : "+91",
+      mobile: user.mobile ? user.mobile.replace(/^\+\d+\s?/, "") : "",
+      country: user.country || "",
+      state: user.state || "",
       city: user.city || "",
       address: user.address || "",
       pincode: user.pincode || "",
       password: "",
-    }));
-    setStates([]);
-    setCities([]);
+    });
+
+    // load states/cities if we have ISO codes stored
+    if (user.country) {
+      const s = State.getStatesOfCountry(user.country);
+      setStates(s || []);
+    } else {
+      setStates([]);
+    }
+    if (user.country && user.state) {
+      const c = City.getCitiesOfState(user.country, user.state);
+      setCities(c || []);
+    } else {
+      setCities([]);
+    }
+
     setErrors({});
     setEditingId(user.id);
     setOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this user?")) return;
+    try {
+      await userApi.remove(id);
+      await loadUsers();
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to delete user");
+    }
   };
 
   const handleSubmit = async () => {
@@ -147,34 +180,61 @@ const UserMasterPage = () => {
       return;
     }
 
+    // construct payload the backend expects
     const payload = {
       userId: form.userId.trim(),
       username: form.username.trim(),
       fullName: form.fullName.trim(),
       email: form.email.trim(),
       mobile: `${form.countryCode}${form.mobile.trim()}`,
-      country: form.country, // ISO2 like "IN"
-      state: form.state,     // ISO like "MH"
-      city: form.city,
+      country: form.country || null,
+      state: form.state || null,
+      city: form.city || null,
       address: form.address.trim(),
       pincode: form.pincode.trim(),
       ...(editingId ? {} : { password: form.password }),
     };
 
-    if (editingId) {
-      await userApi.update(editingId, payload);
-    } else {
-      await userApi.create(payload);
-    }
+    try {
+      if (editingId) {
+        await userApi.update(editingId, payload);
+      } else {
+        await userApi.create(payload);
+      }
 
-    await loadUsers();
-    setOpen(false);
-  };
+      // success: show auto dismissing snackbar
+      setSuccessOpen(true);
+      setTimeout(() => setSuccessOpen(false), 2000);
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this user?")) {
-      await userApi.remove(id);
       await loadUsers();
+      setOpen(false);
+    } catch (err) {
+      console.error("Save failed", err);
+      const resp = err?.response?.data;
+
+      // Backend duplicate response shape: { error: 'DUPLICATE', fields: ['username','email'], message: '...' }
+      if (resp?.error === "DUPLICATE" && Array.isArray(resp.fields)) {
+        const fieldMap = {};
+        resp.fields.forEach((f) => {
+          // map backend field names to form inputs
+          if (f === "userId") fieldMap.userId = "User ID already exists";
+          if (f === "username") fieldMap.username = "Username already exists";
+          if (f === "email") fieldMap.email = "Email already exists";
+          if (f === "mobile") fieldMap.mobile = "Mobile already exists";
+        });
+        setErrors((prev) => ({ ...prev, ...fieldMap }));
+        return;
+      }
+
+      // Generic validation error from backend
+      if (resp?.error === "VALIDATION") {
+        alert(resp.message || "Validation failed");
+        return;
+      }
+
+      // Fallback: show message
+      const msg = resp?.message || "Failed to save user";
+      alert(msg);
     }
   };
 
@@ -190,8 +250,8 @@ const UserMasterPage = () => {
       </Box>
 
       <Grid container spacing={2}>
-        {users.map((user) => (
-          <Grid item xs={12} md={6} key={user.id}>
+        {users.map((u) => (
+          <Grid item xs={12} md={6} key={u.id}>
             <Paper
               sx={{
                 p: 2,
@@ -200,18 +260,28 @@ const UserMasterPage = () => {
                 alignItems: "center",
               }}
             >
+              <Avatar
+                variant="rounded"
+                sx={{ width: 72, height: 72, borderRadius: 10, marginRight: 0, paddingRight: 0 }}
+                src={thumbnail}
+                alt={u.full_name}
+              />
               <Box>
-                <Typography fontWeight="600">{user.full_name}</Typography>
-                <Typography variant="body2">{user.email}</Typography>
+                <Typography fontWeight={600}>{u.full_name}</Typography>
+                <Typography variant="body2">{u.email}</Typography>
                 <Typography variant="caption">
-                  {user.city}, {user.state}
+                  {u.city || u.state
+                    ? `${u.city || ""}${u.city && u.state ? ", " : ""}${
+                        u.state || ""
+                      }`
+                    : ""}
                 </Typography>
               </Box>
               <Box>
-                <IconButton onClick={() => openEdit(user)}>
+                <IconButton onClick={() => openEdit(u)}>
                   <Edit />
                 </IconButton>
-                <IconButton onClick={() => handleDelete(user.id)}>
+                <IconButton onClick={() => handleDelete(u.id)}>
                   <Delete />
                 </IconButton>
               </Box>
@@ -220,13 +290,17 @@ const UserMasterPage = () => {
         ))}
       </Grid>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>
-          {editingId ? "Edit User" : "Create New User"}
-        </DialogTitle>
+      {/* Dialog for create/edit */}
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>{editingId ? "Edit User" : "Create New User"}</DialogTitle>
+
         <DialogContent>
           <Grid container spacing={2} mt={1}>
-            {/* IDs / name */}
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -239,6 +313,7 @@ const UserMasterPage = () => {
                 helperText={errors.userId}
               />
             </Grid>
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -251,6 +326,7 @@ const UserMasterPage = () => {
                 helperText={errors.username}
               />
             </Grid>
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -263,7 +339,6 @@ const UserMasterPage = () => {
               />
             </Grid>
 
-            {/* email */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -276,7 +351,6 @@ const UserMasterPage = () => {
               />
             </Grid>
 
-            {/* mobile + code */}
             <Grid item xs={4} md={2}>
               <FormControl fullWidth>
                 <InputLabel id="code-label">Code</InputLabel>
@@ -296,6 +370,7 @@ const UserMasterPage = () => {
                 </Select>
               </FormControl>
             </Grid>
+
             <Grid item xs={8} md={4}>
               <TextField
                 fullWidth
@@ -309,7 +384,6 @@ const UserMasterPage = () => {
               />
             </Grid>
 
-            {/* Country */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel id="country-label">Country</InputLabel>
@@ -334,7 +408,6 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
-            {/* State */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth disabled={!states.length}>
                 <InputLabel id="state-label">State</InputLabel>
@@ -359,7 +432,6 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
-            {/* City */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth disabled={!cities.length}>
                 <InputLabel id="city-label">City</InputLabel>
@@ -384,7 +456,6 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
-            {/* Address + Pincode */}
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
@@ -398,6 +469,7 @@ const UserMasterPage = () => {
                 minRows={2}
               />
             </Grid>
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -411,7 +483,6 @@ const UserMasterPage = () => {
               />
             </Grid>
 
-            {/* Password – only on create */}
             {!editingId && (
               <Grid item xs={12} md={6}>
                 <TextField
@@ -435,10 +506,21 @@ const UserMasterPage = () => {
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSubmit}>
-            Submit
+            Save
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={successOpen}
+        autoHideDuration={2000}
+        onClose={() => setSuccessOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity="success" sx={{ width: "100%" }}>
+          User saved successfully!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

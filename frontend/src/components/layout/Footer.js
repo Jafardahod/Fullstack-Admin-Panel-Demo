@@ -12,7 +12,7 @@ const Footer = () => {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        © {new Date().getFullYear()} Assignment App. All rights reserved.
+        © {new Date().getFullYear()} Jafaruttayyar Dahodwala. All rights reserved.
       </Typography>
     </Box>
   );
