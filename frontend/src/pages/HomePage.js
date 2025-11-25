@@ -3,19 +3,16 @@ import React, { useEffect, useState } from "react";
 import {
   Grid,
   Card,
-  CardContent,
-  CardActions,
   Avatar,
   Typography,
   Box,
   Divider,
-  Button,
-  Chip,
 } from "@mui/material";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
-import axiosClient from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
+import { useSearch } from "../context/SearchContext";
+import { userApi } from "../api/userApi";
+import { itemApi } from "../api/itemApi";
 
 /**
  * Shows two sections:
@@ -42,14 +39,14 @@ const UserCard = ({ u }) => {
         <Typography variant="body2" color="text.secondary">
           @{u.username} · {u.email}
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 0.5, display: "block" }}
+        >
           {u.city || "—"} {u.state ? `, ${u.state}` : ""}
         </Typography>
       </Box>
-      {/* <CardActions sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <Chip icon={<AccountCircleIcon />} label="User" size="small" />
-        <Button size="small" variant="outlined">View</Button>
-      </CardActions> */}
     </Card>
   );
 };
@@ -76,10 +73,6 @@ const ItemCard = ({ i }) => {
           ₹{Number(i.item_price).toFixed(2)}
         </Typography>
       </Box>
-      {/* <CardActions sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <Chip label="In stock" size="small" color="success" />
-        <Button size="small" variant="outlined">View</Button>
-      </CardActions> */}
     </Card>
   );
 };
@@ -87,25 +80,32 @@ const ItemCard = ({ i }) => {
 const HomePage = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const { q } = useSearch(); // <-- global search term
 
   const [users, setUsers] = useState([]);
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchData = async (searchTerm = "") => {
+    setLoading(true);
+    try {
+      const [usersData, itemsData] = await Promise.all([
+        isAdmin ? userApi.getAll(searchTerm) : Promise.resolve([]),
+        itemApi.getAll(searchTerm),
+      ]);
+
+      setUsers(usersData || []);
+      setItems(itemsData || []);
+    } catch (err) {
+      console.error("Home fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        if (isAdmin) {
-          const resU = await axiosClient.get("/users");
-          setUsers(resU.data || []);
-        }
-        const resI = await axiosClient.get("/items");
-        setItems(resI.data || []);
-      } catch (err) {
-        console.error("Home fetch error:", err);
-      }
-    };
-    fetch();
-  }, [isAdmin]);
+    fetchData(q);
+  }, [q, isAdmin]);
 
   return (
     <Box>
@@ -116,7 +116,14 @@ const HomePage = () => {
       <Grid container spacing={3}>
         {isAdmin && (
           <Grid item xs={12} md={6}>
-            <Box sx={{ mb: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box
+              sx={{
+                mb: 1,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Users
               </Typography>
@@ -125,23 +132,34 @@ const HomePage = () => {
               </Typography>
             </Box>
             <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              {users.map((u) => (
-                <Grid key={u.id} item xs={12}>
-                  <UserCard u={u} />
-                </Grid>
-              ))}
-              {users.length === 0 && (
-                <Grid item xs={12}>
-                  <Typography color="text.secondary">No users yet.</Typography>
-                </Grid>
-              )}
-            </Grid>
+            {loading ? (
+              <Typography color="text.secondary">Searching...</Typography>
+            ) : (
+              <Grid container spacing={2}>
+                {users.map((u) => (
+                  <Grid key={u.id} item xs={12}>
+                    <UserCard u={u} />
+                  </Grid>
+                ))}
+                {users.length === 0 && (
+                  <Grid item xs={12}>
+                    <Typography color="text.secondary">No users yet.</Typography>
+                  </Grid>
+                )}
+              </Grid>
+            )}
           </Grid>
         )}
 
         <Grid item xs={12} md={isAdmin ? 6 : 12}>
-          <Box sx={{ mb: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box
+            sx={{
+              mb: 1,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Items
             </Typography>
@@ -150,18 +168,22 @@ const HomePage = () => {
             </Typography>
           </Box>
           <Divider sx={{ mb: 2 }} />
-          <Grid container spacing={2}>
-            {items.map((i) => (
-              <Grid key={i.id} item xs={12} sm={6} md={12}>
-                <ItemCard i={i} />
-              </Grid>
-            ))}
-            {items.length === 0 && (
-              <Grid item xs={12}>
-                <Typography color="text.secondary">No items yet.</Typography>
-              </Grid>
-            )}
-          </Grid>
+          {loading ? (
+            <Typography color="text.secondary">Searching...</Typography>
+          ) : (
+            <Grid container spacing={2}>
+              {items.map((i) => (
+                <Grid key={i.id} item xs={12} sm={6} md={12}>
+                  <ItemCard i={i} />
+                </Grid>
+              ))}
+              {items.length === 0 && (
+                <Grid item xs={12}>
+                  <Typography color="text.secondary">No items yet.</Typography>
+                </Grid>
+              )}
+            </Grid>
+          )}
         </Grid>
       </Grid>
     </Box>

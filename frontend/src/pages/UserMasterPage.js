@@ -24,6 +24,7 @@ import { Edit, Delete } from "@mui/icons-material";
 import { userApi } from "../api/userApi";
 import { Country, State, City } from "country-state-city";
 import { validateUserForm } from "../utils/validation";
+import { useSearch } from "../context/SearchContext";
 
 const thumbnail = "/mnt/data/a04fb529-dace-41cc-9324-c196588840b9.png";
 
@@ -43,6 +44,8 @@ const emptyForm = {
 };
 
 const UserMasterPage = () => {
+  const { q } = useSearch(); // <-- global search term
+
   const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -56,9 +59,9 @@ const UserMasterPage = () => {
   const [cities, setCities] = useState([]);
   const [countryCodes, setCountryCodes] = useState([]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (searchTerm = "") => {
     try {
-      const list = await userApi.getAll();
+      const list = await userApi.getAll(searchTerm);
       setUsers(list);
     } catch (err) {
       console.error("Failed to load users", err);
@@ -66,13 +69,13 @@ const UserMasterPage = () => {
   };
 
   useEffect(() => {
+    // initial load + country data
     loadUsers();
 
-    // load country/state/city once
     const cList = Country.getAllCountries();
     setCountries(cList || []);
 
-    const codes = cList
+    const codes = (cList || [])
       .filter((c) => !!c.phonecode)
       .map((c) => ({
         value: `+${c.phonecode}`,
@@ -85,6 +88,11 @@ const UserMasterPage = () => {
 
     setCountryCodes(codes);
   }, []);
+
+  // 🔍 React to global search changes
+  useEffect(() => {
+    loadUsers(q || "");
+  }, [q]);
 
   const handleCountryChange = (isoCode) => {
     const countryStates = State.getStatesOfCountry(isoCode) || [];
@@ -140,7 +148,6 @@ const UserMasterPage = () => {
       password: "",
     });
 
-    // load states/cities if we have ISO codes stored
     if (user.country) {
       const s = State.getStatesOfCountry(user.country);
       setStates(s || []);
@@ -163,7 +170,7 @@ const UserMasterPage = () => {
     if (!window.confirm("Delete this user?")) return;
     try {
       await userApi.remove(id);
-      await loadUsers();
+      await loadUsers(q || "");
     } catch (err) {
       console.error("Delete failed", err);
       alert("Failed to delete user");
@@ -180,7 +187,6 @@ const UserMasterPage = () => {
       return;
     }
 
-    // construct payload the backend expects
     const payload = {
       userId: form.userId.trim(),
       username: form.username.trim(),
@@ -202,21 +208,18 @@ const UserMasterPage = () => {
         await userApi.create(payload);
       }
 
-      // success: show auto dismissing snackbar
       setSuccessOpen(true);
       setTimeout(() => setSuccessOpen(false), 2000);
 
-      await loadUsers();
+      await loadUsers(q || "");
       setOpen(false);
     } catch (err) {
       console.error("Save failed", err);
       const resp = err?.response?.data;
 
-      // Backend duplicate response shape: { error: 'DUPLICATE', fields: ['username','email'], message: '...' }
       if (resp?.error === "DUPLICATE" && Array.isArray(resp.fields)) {
         const fieldMap = {};
         resp.fields.forEach((f) => {
-          // map backend field names to form inputs
           if (f === "userId") fieldMap.userId = "User ID already exists";
           if (f === "username") fieldMap.username = "Username already exists";
           if (f === "email") fieldMap.email = "Email already exists";
@@ -226,13 +229,11 @@ const UserMasterPage = () => {
         return;
       }
 
-      // Generic validation error from backend
       if (resp?.error === "VALIDATION") {
         alert(resp.message || "Validation failed");
         return;
       }
 
-      // Fallback: show message
       const msg = resp?.message || "Failed to save user";
       alert(msg);
     }
@@ -262,7 +263,13 @@ const UserMasterPage = () => {
             >
               <Avatar
                 variant="rounded"
-                sx={{ width: 72, height: 72, borderRadius: 10, marginRight: 0, paddingRight: 0 }}
+                sx={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 10,
+                  marginRight: 0,
+                  paddingRight: 0,
+                }}
                 src={thumbnail}
                 alt={u.full_name}
               />
@@ -288,6 +295,11 @@ const UserMasterPage = () => {
             </Paper>
           </Grid>
         ))}
+        {users.length === 0 && (
+          <Grid item xs={12}>
+            <Typography color="text.secondary">No users found.</Typography>
+          </Grid>
+        )}
       </Grid>
 
       {/* Dialog for create/edit */}
@@ -506,7 +518,7 @@ const UserMasterPage = () => {
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSubmit}>
-            Save
+            Submit
           </Button>
         </DialogActions>
       </Dialog>
