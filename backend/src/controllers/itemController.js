@@ -1,15 +1,33 @@
 import pool from '../config/db.js';
 
+// backend/src/controllers/itemController.js (getItems only)
 export const getItems = async (req, res, next) => {
   try {
+    const q = (req.query.q || '').trim();
+
+    if (!q) {
+      const [rows] = await pool.query(
+        'SELECT id, item_name, item_price, item_type, created_at FROM items ORDER BY created_at DESC'
+      );
+      return res.json(rows);
+    }
+
+    const like = `%${q}%`;
+
     const [rows] = await pool.query(
-      'SELECT id, item_name, item_price, item_type FROM items'
+      `SELECT id, item_name, item_price, item_type, created_at
+       FROM items
+       WHERE item_name LIKE ? OR item_type LIKE ? OR CAST(item_price AS CHAR) LIKE ?
+       ORDER BY created_at DESC`,
+      [like, like, like]
     );
+
     res.json(rows);
   } catch (err) {
     next(err);
   }
 };
+
 
 export const createItem = async (req, res, next) => {
   try {

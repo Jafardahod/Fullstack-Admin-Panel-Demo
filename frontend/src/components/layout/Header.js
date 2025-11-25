@@ -4,15 +4,24 @@ import {
   Toolbar,
   Typography,
   IconButton,
+  TextField,
   Box,
   Avatar,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
 import { useAuth } from "../../context/AuthContext";
+import { useSearch } from "../../context/SearchContext";
+import { debounce } from "../../utils/debounce";
 
 const Header = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+
+  const { setQ } = useSearch();
+
+  const handleSearch = debounce((value) => {
+    setQ(value);
+  }, 400);
 
   const initials = user?.fullName
     ? user.fullName
@@ -62,14 +71,16 @@ const Header = ({ onMenuClick }) => {
             bgcolor: "grey.50",
           }}
         >
-          <SearchIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />
-          <Typography
-            variant="body2"
-            sx={{ color: "text.secondary" }}
-            noWrap
-          >
-            Search in items (/)
-          </Typography>
+          <SearchIcon
+            fontSize="small"
+            sx={{ mr: 1, color: "text.secondary" }}
+          />
+          <TextField
+            placeholder="Search users, items..."
+            onChange={(e) => handleSearch(e.target.value)}
+            size="small"
+            sx={{ width: { xs: 140, sm: 400 } }}
+          />
         </Box>
 
         {/* User info */}

@@ -18,16 +18,42 @@ const findDuplicateFields = (rows, payload) => {
   return Array.from(dupes);
 };
 
+// backend/src/controllers/userController.js (only getUsers shown - keep rest unchanged)
 export const getUsers = async (req, res, next) => {
   try {
+    const q = (req.query.q || '').trim();
+
+    if (!q) {
+      const [rows] = await pool.query(
+        "SELECT id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, created_at FROM users WHERE role = 'user' ORDER BY created_at DESC"
+      );
+      return res.json(rows);
+    }
+
+    // safe wildcard search across several columns
+    const like = `%${q}%`;
     const [rows] = await pool.query(
-      "SELECT id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, created_at FROM users WHERE role = 'user' ORDER BY created_at DESC"
+      `SELECT id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, created_at
+       FROM users
+       WHERE role = 'user' AND (
+         username LIKE ? OR
+         full_name LIKE ? OR
+         email LIKE ? OR
+         mobile LIKE ? OR
+         user_id LIKE ? OR
+         city LIKE ? OR
+         state LIKE ?
+       )
+       ORDER BY created_at DESC`,
+      [like, like, like, like, like, like, like]
     );
+
     res.json(rows);
   } catch (err) {
     next(err);
   }
 };
+
 
 export const createUser = async (req, res, next) => {
   try {
