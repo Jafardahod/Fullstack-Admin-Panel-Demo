@@ -79,7 +79,16 @@ const Header = ({ onMenuClick }) => {
             placeholder="Search users, items..."
             onChange={(e) => handleSearch(e.target.value)}
             size="small"
-            sx={{ width: { xs: 140, sm: 400 } }}
+            variant="outlined"
+            sx={{
+              width: "100%",
+              "& .MuiOutlinedInput-notchedOutline": {
+                border: "none",
+              },
+              "& .Mui-focused .MuiOutlinedInput-notchedOutline": {
+                border: "none",
+              },
+            }}
           />
         </Box>
 
