@@ -303,16 +303,29 @@ const UserMasterPage = () => {
       </Grid>
 
       {/* Dialog for create/edit */}
+      {/* ========================= FULL USER FORM DIALOG ========================= */}
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
         fullWidth
         maxWidth="md"
+        aria-labelledby="user-form-dialog"
       >
-        <DialogTitle>{editingId ? "Edit User" : "Create New User"}</DialogTitle>
+        <DialogTitle id="user-form-dialog">
+          {editingId ? "Edit User" : "Create New User"}
+        </DialogTitle>
 
-        <DialogContent>
-          <Grid container spacing={2} mt={1}>
+        {/* Scrollable Content */}
+        <DialogContent
+          sx={{
+            maxHeight: "70vh",
+            overflowY: "auto",
+            pr: 1.5,
+            pt: 1,
+          }}
+        >
+          <Grid container spacing={2}>
+            {/* USER ID */}
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -326,6 +339,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* USERNAME */}
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -339,6 +353,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* FULL NAME */}
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -351,6 +366,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* EMAIL */}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -363,6 +379,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* COUNTRY CODE */}
             <Grid item xs={4} md={2}>
               <FormControl fullWidth>
                 <InputLabel id="code-label">Code</InputLabel>
@@ -383,6 +400,7 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
+            {/* MOBILE */}
             <Grid item xs={8} md={4}>
               <TextField
                 fullWidth
@@ -396,6 +414,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* COUNTRY */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel id="country-label">Country</InputLabel>
@@ -420,6 +439,7 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
+            {/* STATE */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth disabled={!states.length}>
                 <InputLabel id="state-label">State</InputLabel>
@@ -444,6 +464,7 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
+            {/* CITY */}
             <Grid item xs={12} md={4}>
               <FormControl fullWidth disabled={!cities.length}>
                 <InputLabel id="city-label">City</InputLabel>
@@ -468,6 +489,7 @@ const UserMasterPage = () => {
               </FormControl>
             </Grid>
 
+            {/* ADDRESS */}
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
@@ -482,6 +504,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* PINCODE */}
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -495,6 +518,7 @@ const UserMasterPage = () => {
               />
             </Grid>
 
+            {/* PASSWORD (only on create) */}
             {!editingId && (
               <Grid item xs={12} md={6}>
                 <TextField
@@ -515,13 +539,29 @@ const UserMasterPage = () => {
           </Grid>
         </DialogContent>
 
-        <DialogActions>
+        {/* STICKY FOOTER */}
+        <DialogActions
+          sx={{
+            position: "sticky",
+            bottom: 0,
+            backgroundColor: "white",
+            borderTop: "1px solid #ddd",
+            py: 1.5,
+            px: 3,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+            zIndex: 2000,
+          }}
+        >
           <Button onClick={() => setOpen(false)}>Cancel</Button>
+
           <Button variant="contained" onClick={handleSubmit}>
-            Submit
+            {editingId ? "Update" : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
+      {/* ====================== END FULL USER FORM DIALOG ====================== */}
 
       <Snackbar
         open={successOpen}
