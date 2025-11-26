@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const axiosClient = axios.create({
   // baseURL: 'http://localhost:5000/api',
-  baseURL: 'http://https://fullstack-admin-panel-demo.vercel.app/api',
+  baseURL: 'https://fullstack-admin-panel-demo.vercel.app/api',
 });
 
 axiosClient.interceptors.request.use((config) => {
