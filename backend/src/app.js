@@ -1,43 +1,75 @@
 // backend/src/app.js
-import express from 'express';
-import cors from 'cors';
-import authRoutes from './routes/authRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import itemRoutes from './routes/itemRoutes.js';
-import { notFound, errorHandler } from './middleware/errorMiddleware.js';
+import express from "express";
+import cors from "cors";
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import itemRoutes from "./routes/itemRoutes.js";
 
 const app = express();
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+/* ----------------------------
+   CORS CONFIGURATION
+   Allows:
+   - Your production frontend (env)
+   - Localhost 3000
+   - ANY Vercel preview deployment (*.vercel.app)
+----------------------------- */
 
-// CORS options: allow only your frontend origin, allow common methods and headers
 const corsOptions = {
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    // allow the configured frontend origin
-    if (origin === FRONTEND_URL) return callback(null, true);
-    // otherwise block
-    return callback(new Error('CORS policy: This origin is not allowed'), false);
+    if (!origin) return callback(null, true); // allow non-browser clients
+
+    const allowed = [
+      process.env.FRONTEND_URL,      // e.g. https://fullstack-admin-panel-demo.vercel.app
+      "http://localhost:3000",
+    ];
+
+    const isVercelPreview = origin.endsWith(".vercel.app");
+
+    if (allowed.includes(origin) || isVercelPreview) {
+      callback(null, true);
+    } else {
+      console.log("❌ CORS blocked:", origin);
+      callback(new Error("CORS blocked: " + origin), false);
+    }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
-  credentials: true, // if you plan to use cookies/auth credentials
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false, // keep false unless using cookies
 };
 
 app.use(cors(corsOptions));
-// ensure OPTIONS preflight is handled for all routes
-app.options('*', cors(corsOptions));
+app.options("*", cors(corsOptions)); // handle preflight
+
+/* ----------------------------
+   Middleware
+----------------------------- */
 
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/items', itemRoutes);
+/* ----------------------------
+   Routes
+----------------------------- */
 
-app.use(notFound);
-app.use(errorHandler);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/items", itemRoutes);
+
+/* ----------------------------
+   Health check route
+----------------------------- */
+
+app.get("/", (req, res) => {
+  res.json({ status: "Backend running", version: "1.0.0" });
+});
+
+/* ----------------------------
+   Global Error Handler
+----------------------------- */
+
+app.use((err, req, res, next) => {
+  console.error("🔥 Server Error:", err.message);
+  res.status(500).json({ error: "SERVER_ERROR", message: err.message });
+});
 
 export default app;
