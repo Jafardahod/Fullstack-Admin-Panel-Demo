@@ -7,68 +7,75 @@ import itemRoutes from "./routes/itemRoutes.js";
 
 const app = express();
 
-/* ----------------------------
-   CORS CONFIGURATION
-   Allows:
-   - Your production frontend (env)
-   - Localhost 3000
-   - ANY Vercel preview deployment (*.vercel.app)
------------------------------ */
+/**
+ * Read FRONTEND_URL from env.
+ * You may set:
+ *  - a specific URL: https://my-frontend.vercel.app
+ *  - or the special wildcard token: https://*.vercel.app
+ *  - or leave empty/null (we'll still allow .vercel.app and localhost)
+ */
+const FRONTEND_URL = process.env.FRONTEND_URL || "";
+
+function isVercelPreviewOrigin(origin) {
+  try {
+    if (!origin) return false;
+    const host = new URL(origin).host; // e.g. fullstack-admin-....vercel.app
+    return host.endsWith(".vercel.app");
+  } catch (e) {
+    return false;
+  }
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow non-browser clients
+    // allow server-to-server or tools with no origin
+    if (!origin) return callback(null, true);
 
-    const allowed = [
-      process.env.FRONTEND_URL,      // e.g. https://fullstack-admin-panel-demo.vercel.app
-      "http://localhost:3000",
-    ];
-
-    const isVercelPreview = origin.endsWith(".vercel.app");
-
-    if (allowed.includes(origin) || isVercelPreview) {
-      callback(null, true);
-    } else {
-      console.log("❌ CORS blocked:", origin);
-      callback(new Error("CORS blocked: " + origin), false);
+    // 1) exact match with FRONTEND_URL (if set to a real URL)
+    if (FRONTEND_URL && FRONTEND_URL !== "https://*.vercel.app") {
+      if (origin === FRONTEND_URL) return callback(null, true);
     }
+
+    // 2) if FRONTEND_URL is the special wildcard token, accept any vercel.app origin
+    if (FRONTEND_URL === "https://*.vercel.app" && isVercelPreviewOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    // 3) always allow local development
+    if (origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000") {
+      return callback(null, true);
+    }
+
+    // 4) also accept any vercel preview by default (optional fallback)
+    //    -> keep this if you want previews to work without setting env
+    if (isVercelPreviewOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn("CORS blocked:", origin);
+    return callback(new Error("CORS blocked: " + origin), false);
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: false, // keep false unless using cookies
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+  credentials: false,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // handle preflight
-
-/* ----------------------------
-   Middleware
------------------------------ */
+app.options("*", cors(corsOptions));
 
 app.use(express.json());
-
-/* ----------------------------
-   Routes
------------------------------ */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/items", itemRoutes);
 
-/* ----------------------------
-   Health check route
------------------------------ */
-
 app.get("/", (req, res) => {
-  res.json({ status: "Backend running", version: "1.0.0" });
+  res.json({ status: "Backend running" });
 });
 
-/* ----------------------------
-   Global Error Handler
------------------------------ */
-
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err.message);
+  console.error("ERROR:", err.message);
   res.status(500).json({ error: "SERVER_ERROR", message: err.message });
 });
 
