@@ -74,9 +74,24 @@ app.get("/", (req, res) => {
   res.json({ status: "Backend running" });
 });
 
+
+app.get("/api/test-db", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT NOW() AS time");
+    res.json({ ok: true, time: rows[0].time });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 app.use((err, req, res, next) => {
   console.error("ERROR:", err.message);
   res.status(500).json({ error: "SERVER_ERROR", message: err.message });
 });
 
+
 export default app;
+
+
+
