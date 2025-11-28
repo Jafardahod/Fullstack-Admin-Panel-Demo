@@ -1,6 +1,7 @@
 // backend/src/app.js
 import express from "express";
 import cors from "cors";
+import pool from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import itemRoutes from "./routes/itemRoutes.js";
@@ -90,6 +91,19 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "SERVER_ERROR", message: err.message });
 });
 
+
+
+
+function printRoutes(app) {
+  console.log("Registered routes:");
+  app._router.stack
+    .filter(r => r.route)
+    .forEach(r => {
+      const methods = Object.keys(r.route.methods).join(",").toUpperCase();
+      console.log(methods, r.route.path);
+    });
+}
+printRoutes(app);
 
 export default app;
 
