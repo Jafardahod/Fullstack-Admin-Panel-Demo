@@ -16,7 +16,7 @@ export const login = async (req, res, next) => {
     const { username, password } = req.body;
 
     const [rows] = await pool.query(
-      'SELECT * FROM users WHERE username = ?',
+      'SELECT * FROM users WHERE BINARY username = ?',
       [username]
     );
 

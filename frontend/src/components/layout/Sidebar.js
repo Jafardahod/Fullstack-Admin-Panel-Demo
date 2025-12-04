@@ -1,4 +1,5 @@
 // frontend/src/components/layout/Sidebar.js
+import React from "react";
 import {
   Box,
   Drawer,
@@ -10,6 +11,7 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Divider,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
@@ -39,12 +41,24 @@ const Sidebar = ({ open, onToggle }) => {
 
   const userMenu = [
     { label: "Home", path: "/", icon: <HomeIcon /> },
-    { label: "Profile", path: "/dummy1", icon: <PersonIcon /> },
-    { label: "Orders", path: "/dummy2", icon: <ReceiptIcon /> },
-    { label: "Support", path: "/dummy3", icon: <HelpOutlineIcon /> },
+    { label: "Profile", path: "/profile", icon: <PersonIcon /> },
+    { label: "Orders", path: "/orders", icon: <ReceiptIcon /> },
+    { label: "Support", path: "/support", icon: <HelpOutlineIcon /> },
   ];
 
   const menu = isAdmin ? adminMenu : userMenu;
+
+  const drawerSx = {
+    "& .MuiDrawer-paper": {
+      width: drawerWidth,
+      boxSizing: "border-box",
+      bgcolor: "background.sidebar",
+      color: "text.primary",
+      borderRight: "1px solid",
+      borderColor: "divider",
+      transition: "background-color 220ms ease, color 220ms ease",
+    },
+  };
 
   const drawerContent = (
     <Box
@@ -52,7 +66,7 @@ const Sidebar = ({ open, onToggle }) => {
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "grey.50",
+        bgcolor: "background.sidebar",
       }}
     >
       <Toolbar
@@ -82,6 +96,13 @@ const Sidebar = ({ open, onToggle }) => {
                   mx: 1,
                   mb: 0.5,
                   borderRadius: 2,
+                  transition: "background-color 180ms ease, color 180ms ease",
+                  "&:hover": {
+                    bgcolor:
+                      theme.palette.mode === "light"
+                        ? "action.hover"
+                        : "action.selected",
+                  },
                   ...(active && {
                     bgcolor: "primary.main",
                     color: "primary.contrastText",
@@ -91,12 +112,20 @@ const Sidebar = ({ open, onToggle }) => {
                   }),
                 }}
               >
-                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
                 <ListItemText primary={item.label} />
               </ListItemButton>
             );
           })}
         </List>
+      </Box>
+
+      <Divider />
+
+      <Box sx={{ p: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          Version 1.0
+        </Typography>
       </Box>
     </Box>
   );
@@ -107,12 +136,7 @@ const Sidebar = ({ open, onToggle }) => {
       open={open}
       onClose={onToggle}
       ModalProps={{ keepMounted: true }}
-      sx={{
-        "& .MuiDrawer-paper": {
-          width: drawerWidth,
-          boxSizing: "border-box",
-        },
-      }}
+      sx={drawerSx}
     >
       {drawerContent}
     </Drawer>

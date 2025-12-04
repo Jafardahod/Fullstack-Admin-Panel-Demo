@@ -1,14 +1,22 @@
-import { Box, Typography } from '@mui/material';
+// frontend/src/components/layout/Footer.js
+import React from "react";
+import { Box, Typography, useTheme } from "@mui/material";
 
 const Footer = () => {
+  const theme = useTheme();
+
   return (
     <Box
       component="footer"
       sx={{
-        mt: 'auto',
+        mt: "auto",
         py: 2,
-        textAlign: 'center',
-        borderTop: '1px solid #e0e0e0',
+        textAlign: "center",
+        bgcolor: "background.paper",
+        color: "text.secondary",
+        borderTop: "1px solid",
+        borderColor: "divider",
+        transition: "background-color 220ms ease, color 220ms ease",
       }}
     >
       <Typography variant="body2" color="text.secondary">

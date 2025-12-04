@@ -109,9 +109,11 @@ const HomePage = () => {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 2, fontWeight: 800 }}>
-        Dashboard
-      </Typography>
+      {user.role === "admin" ? (<Typography variant="h4" sx={{ mb: 2, fontWeight: 500 }}>
+        Admin Dashboard
+      </Typography>) : (<Typography variant="h4" sx={{ mb: 2, fontWeight: 500 }}>
+        User Dashboard
+      </Typography>)}
 
       <Grid container spacing={3}>
         {isAdmin && (

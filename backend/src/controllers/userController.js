@@ -1,4 +1,3 @@
-// backend/src/controllers/userController.js
 import pool from '../config/db.js';
 import bcrypt from 'bcryptjs';
 
@@ -18,37 +17,110 @@ const findDuplicateFields = (rows, payload) => {
   return Array.from(dupes);
 };
 
-// backend/src/controllers/userController.js (only getUsers shown - keep rest unchanged)
+/**
+ * Map UI/backend incoming user type values to DB role values.
+ * Accepts: userType (e.g. "Admin User" / "Normal User"), or user_type, or role.
+ * Result: 'admin' or 'user' (default 'user').
+ */
+const normalizeRole = (body) => {
+  if (!body) return 'user';
+  const raw =
+    (body.userType && String(body.userType).trim()) ||
+    (body.user_type && String(body.user_type).trim()) ||
+    (body.role && String(body.role).trim()) ||
+    '';
+  if (!raw) return 'user';
+  if (/admin/i.test(raw) || raw.toLowerCase() === 'admin') return 'admin';
+  return 'user';
+};
+
 export const getUsers = async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
 
+    // Expect authMiddleware to have attached the requester info.
+    // e.g. req.user = { id: 123, role: 'admin' }
+    const requester = req.user || {};
+    const requesterId = requester.id || null;
+    const isAdmin = String(requester.role || '').toLowerCase() === 'admin';
+
+    // Columns we return (same as before + is_active)
+    const cols =
+      'id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, is_active, created_at';
+
+    // Helper to build search clause used in both admin and non-admin flows
+    const buildSearchClause = () => {
+      return `(
+        username LIKE ? OR
+        full_name LIKE ? OR
+        email LIKE ? OR
+        mobile LIKE ? OR
+        user_id LIKE ? OR
+        city LIKE ? OR
+        state LIKE ?
+      )`;
+    };
+
     if (!q) {
+      // No search: return either all users (except self) for admins,
+      // or only role='user' for non-admins (backwards compatible).
+      if (isAdmin) {
+        // Admin: return all users except the requesting admin
+        if (requesterId) {
+          const [rows] = await pool.query(
+            `SELECT ${cols} FROM users WHERE id != ? ORDER BY created_at DESC`,
+            [requesterId]
+          );
+          return res.json(rows);
+        } else {
+          // Fallback: if no requester id available, return all users
+          const [rows] = await pool.query(
+            `SELECT ${cols} FROM users ORDER BY created_at DESC`
+          );
+          return res.json(rows);
+        }
+      } else {
+        // Non-admin (previous behaviour) — return only normal users
+        const [rows] = await pool.query(
+          `SELECT ${cols} FROM users WHERE role = 'user' ORDER BY created_at DESC`
+        );
+        return res.json(rows);
+      }
+    }
+
+    // Search case
+    const like = `%${q}%`;
+
+    if (isAdmin) {
+      // Search across all users but exclude the requesting admin's row
+      if (requesterId) {
+        const [rows] = await pool.query(
+          `SELECT ${cols} FROM users
+           WHERE ${buildSearchClause()} AND id != ?
+           ORDER BY created_at DESC`,
+          [like, like, like, like, like, like, like, requesterId]
+        );
+        return res.json(rows);
+      } else {
+        // fallback - no requesterId
+        const [rows] = await pool.query(
+          `SELECT ${cols} FROM users
+           WHERE ${buildSearchClause()}
+           ORDER BY created_at DESC`,
+          [like, like, like, like, like, like, like]
+        );
+        return res.json(rows);
+      }
+    } else {
+      // Non-admin search: keep showing only role='user'
       const [rows] = await pool.query(
-        "SELECT id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, created_at FROM users WHERE role = 'user' ORDER BY created_at DESC"
+        `SELECT ${cols} FROM users
+         WHERE role = 'user' AND ${buildSearchClause()}
+         ORDER BY created_at DESC`,
+        [like, like, like, like, like, like, like]
       );
       return res.json(rows);
     }
-
-    // safe wildcard search across several columns
-    const like = `%${q}%`;
-    const [rows] = await pool.query(
-      `SELECT id, user_id, username, full_name, email, mobile, country, state, city, address, pincode, role, created_at
-       FROM users
-       WHERE role = 'user' AND (
-         username LIKE ? OR
-         full_name LIKE ? OR
-         email LIKE ? OR
-         mobile LIKE ? OR
-         user_id LIKE ? OR
-         city LIKE ? OR
-         state LIKE ?
-       )
-       ORDER BY created_at DESC`,
-      [like, like, like, like, like, like, like]
-    );
-
-    res.json(rows);
   } catch (err) {
     next(err);
   }
@@ -71,6 +143,9 @@ export const createUser = async (req, res, next) => {
       password,
     } = req.body;
 
+    // Determine role from payload (accept userType/user_type/role)
+    const role = normalizeRole(req.body); // 'admin' or 'user'
+
     if (!userId || !username || !fullName || !email || !password) {
       return res.status(400).json({ error: 'VALIDATION', message: 'Missing required fields' });
     }
@@ -78,7 +153,7 @@ export const createUser = async (req, res, next) => {
     // Normalize mobile (store as string exactly as provided)
     const mobileVal = mobile ? String(mobile).trim() : '';
 
-    // Check any conflict for user_id, username, email, mobile
+    // Check any conflict for user_id, username, email, mobile (global)
     const [existing] = await pool.query(
       `SELECT id, user_id, username, email, mobile FROM users
        WHERE user_id = ? OR username = ? OR email = ? OR mobile = ?`,
@@ -104,8 +179,8 @@ export const createUser = async (req, res, next) => {
 
     await pool.query(
       `INSERT INTO users
-      (user_id, username, full_name, email, mobile, country, state, city, address, pincode, password_hash, role)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')`,
+      (user_id, username, full_name, email, mobile, country, state, city, address, pincode, password_hash, role, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         userId,
         username,
@@ -118,6 +193,7 @@ export const createUser = async (req, res, next) => {
         address || null,
         pincode || null,
         passwordHash,
+        role,
       ]
     );
 
@@ -171,9 +247,14 @@ export const updateUser = async (req, res, next) => {
       });
     }
 
+    // If front sends userType / user_type / role, allow admin to change role here.
+    const role = normalizeRole(req.body);
+
     await pool.query(
-      `UPDATE users SET full_name = ?, email = ?, mobile = ?, country = ?, state = ?, city = ?, address = ?, pincode = ? WHERE id = ? AND role = 'user'`,
-      [fullName, email, mobileVal, country || null, state || null, city || null, address || null, pincode || null, id]
+      `UPDATE users
+        SET full_name = ?, email = ?, mobile = ?, country = ?, state = ?, city = ?, address = ?, pincode = ?, role = ?
+       WHERE id = ? AND role = 'user'`,
+      [fullName, email, mobileVal, country || null, state || null, city || null, address || null, pincode || null, role, id]
     );
 
     res.json({ message: 'USER_UPDATED' });
@@ -182,11 +263,30 @@ export const updateUser = async (req, res, next) => {
   }
 };
 
+// soft-delete -> deactivate user
 export const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    await pool.query("DELETE FROM users WHERE id = ? AND role = 'user'", [id]);
-    res.json({ message: 'USER_DELETED' });
+    if (!id) return res.status(400).json({ error: 'VALIDATION', message: 'Missing id' });
+
+    // Set is_active = 0 rather than deleting
+    await pool.query("UPDATE users SET is_active = 0 WHERE id = ? AND role = 'user'", [id]);
+
+    res.json({ message: 'USER_DEACTIVATED' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// activate user (admin only)
+export const activateUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'VALIDATION', message: 'Missing id' });
+
+    await pool.query("UPDATE users SET is_active = 1 WHERE id = ?", [id]);
+
+    res.json({ message: 'USER_ACTIVATED' });
   } catch (err) {
     next(err);
   }

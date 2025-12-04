@@ -21,7 +21,16 @@ const MainLayout = ({ children }) => {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "grey.100" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        // use theme page background so dark mode applies to whole shell
+        bgcolor: "background.default",
+        color: "text.primary",
+        transition: "background-color 220ms ease, color 220ms ease",
+      }}
+    >
       <Header onMenuClick={handleToggleSidebar} />
       <Sidebar open={sidebarOpen} onToggle={handleToggleSidebar} />
 
@@ -34,7 +43,7 @@ const MainLayout = ({ children }) => {
           pt: 8, // space for AppBar
           pb: 2,
           px: { xs: 1.5, md: 3 },
-          transition: theme.transitions.create("margin", {
+          transition: theme.transitions.create(["margin", "background-color"], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.standard,
           }),
@@ -46,14 +55,27 @@ const MainLayout = ({ children }) => {
       >
         <Container
           maxWidth="xl"
-          sx={{
+          sx={(t) => ({
             flex: 1,
-            mb: 2,
+            mt: 1,
+            mb: 1,
             p: { xs: 1.5, md: 3 },
             borderRadius: 3,
-            bgcolor: "white",
-            boxShadow: { xs: 0, md: 3 },
-          }}
+            // use theme paper so it adapts to light/dark
+            bgcolor: "background.paper",
+            // subtle border that adapts to mode to avoid harsh contrast
+            border: "1px solid",
+            borderColor:
+              t.palette.mode === "light"
+                ? "rgba(15,23,42,0.04)"
+                : "rgba(255,255,255,0.04)",
+            // box shadow only on desktop for depth in light mode; darker mode keep it minimal
+            boxShadow:
+              t.palette.mode === "light"
+                ? { xs: "none", md: t.shadows[3] }
+                : { xs: "none", md: "none" },
+            transition: "background-color 220ms ease, border-color 220ms ease",
+          })}
         >
           {children}
         </Container>

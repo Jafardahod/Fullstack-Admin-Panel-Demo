@@ -3,8 +3,8 @@ import { AuthProvider } from "./context/AuthContext";
 import { SearchProvider } from "./context/SearchContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import MainLayout from "./components/layout/MainLayout";
-
-import LoginPage from "./pages/LoginPage";
+import { Box } from '@mui/material';
+import LoginPage from "./pages/LoginPage"
 import HomePage from "./pages/HomePage";
 import UserMasterPage from "./pages/UserMasterPage";
 import ItemMasterPage from "./pages/ItemMasterPage";
@@ -14,6 +14,7 @@ import DummyPage3 from "./pages/DummyPage3";
 
 const App = () => {
   return (
+    
     <AuthProvider>
       <SearchProvider>
         <Router>

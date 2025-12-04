@@ -19,13 +19,41 @@ import {
   FormControl,
   Snackbar,
   Alert,
+  Chip,
+  Stack,
+  Tooltip,
 } from "@mui/material";
-import { Edit, Delete } from "@mui/icons-material";
+import { Edit, Delete, CheckCircle, Block } from "@mui/icons-material";
 import { userApi } from "../api/userApi";
 import { Country, State, City } from "country-state-city";
 import { validateUserForm } from "../utils/validation";
 import { useSearch } from "../context/SearchContext";
 
+
+const parseMobileString = (mobileStr, defaultCode = '+91') => {
+  if (!mobileStr) return { countryCode: defaultCode, mobile: '' };
+
+  const m = String(mobileStr).trim();
+
+  // 1) Try common: +<digits> separator? rest
+  let match = m.match(/^(\+\d{1,2})(?:[ \-\u00A0])?(.*)$/);
+  if (match) {
+    const code = match[1];
+    // remove anything but digits from remaining part
+    const rest = (match[2] || '').replace(/\D/g, '');
+    return { countryCode: code, mobile: rest };
+  }
+
+  // 2) If no separator but starts with + and digits (e.g. +911234567890)
+  match = m.match(/^(\+\d{1,4})(\d{4,})$/);
+  if (match) {
+    return { countryCode: match[1], mobile: match[2] };
+  }
+
+  // 3) last resort: no country code found — strip non-digit and return default code
+  const digits = m.replace(/\D/g, '');
+  return { countryCode: defaultCode, mobile: digits };
+};
 const thumbnail = "/mnt/data/a04fb529-dace-41cc-9324-c196588840b9.png";
 
 const emptyForm = {
@@ -35,16 +63,23 @@ const emptyForm = {
   email: "",
   countryCode: "+91",
   mobile: "",
-  country: "", // ISO2
-  state: "", // state ISO
-  city: "", // city name
+  country: "",
+  state: "",
+  city: "",
   address: "",
   pincode: "",
   password: "",
+  userType: "Admin User",
+};
+
+const mapRoleToUserType = (role) => {
+  if (!role) return "Normal User";
+  if (role.toLowerCase() === "admin") return "Admin User";
+  return "Normal User";
 };
 
 const UserMasterPage = () => {
-  const { q } = useSearch(); // <-- global search term
+  const { q } = useSearch();
 
   const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
@@ -69,7 +104,6 @@ const UserMasterPage = () => {
   };
 
   useEffect(() => {
-    // initial load + country data
     loadUsers();
 
     const cList = Country.getAllCountries();
@@ -89,7 +123,6 @@ const UserMasterPage = () => {
     setCountryCodes(codes);
   }, []);
 
-  // 🔍 React to global search changes
   useEffect(() => {
     loadUsers(q || "");
   }, [q]);
@@ -130,22 +163,23 @@ const UserMasterPage = () => {
   };
 
   const openEdit = (user) => {
+    // parse mobile and country code robustly
+    const { countryCode, mobile } = parseMobileString(user.mobile, "+91");
+
     setForm({
       userId: user.user_id,
       username: user.username,
       fullName: user.full_name,
       email: user.email,
-      countryCode:
-        user.mobile && user.mobile.startsWith("+")
-          ? user.mobile.replace(/^(\+\d+).*/, "$1")
-          : "+91",
-      mobile: user.mobile ? user.mobile.replace(/^\+\d+\s?/, "") : "",
+      countryCode: countryCode, // parsed
+      mobile: mobile, // parsed digits only
       country: user.country || "",
       state: user.state || "",
       city: user.city || "",
       address: user.address || "",
       pincode: user.pincode || "",
       password: "",
+      userType: mapRoleToUserType(user.role),
     });
 
     if (user.country) {
@@ -166,14 +200,27 @@ const UserMasterPage = () => {
     setOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this user?")) return;
+  // Deactivate (soft delete)
+  const handleDeactivate = async (id) => {
+    if (!window.confirm("Deactivate this user?")) return;
     try {
-      await userApi.remove(id);
+      await userApi.deactivate(id); // calls DELETE /api/users/:id which now sets is_active = 0
       await loadUsers(q || "");
     } catch (err) {
-      console.error("Delete failed", err);
-      alert("Failed to delete user");
+      console.error("Deactivate failed", err);
+      alert("Failed to deactivate user");
+    }
+  };
+
+  // Activate
+  const handleActivate = async (id) => {
+    if (!window.confirm("Activate this user?")) return;
+    try {
+      await userApi.activate(id); // calls PATCH /api/users/:id/activate
+      await loadUsers(q || "");
+    } catch (err) {
+      console.error("Activate failed", err);
+      alert("Failed to activate user");
     }
   };
 
@@ -186,19 +233,21 @@ const UserMasterPage = () => {
       setErrors(validationErrors);
       return;
     }
+    const mobileDigits = (form.mobile || '').toString().replace(/\D/g, '');
 
     const payload = {
       userId: form.userId.trim(),
       username: form.username.trim(),
       fullName: form.fullName.trim(),
       email: form.email.trim(),
-      mobile: `${form.countryCode}${form.mobile.trim()}`,
+      mobile: `${form.countryCode}${mobileDigits}`,
       country: form.country || null,
       state: form.state || null,
       city: form.city || null,
       address: form.address.trim(),
       pincode: form.pincode.trim(),
       ...(editingId ? {} : { password: form.password }),
+      user_type: form.userType,
     };
 
     try {
@@ -273,8 +322,20 @@ const UserMasterPage = () => {
                 src={thumbnail}
                 alt={u.full_name}
               />
-              <Box>
-                <Typography fontWeight={600}>{u.full_name}</Typography>
+              <Box sx={{ flex: 1, mx: 2 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography fontWeight={600}>{u.full_name}</Typography>
+                  <Chip
+                    size="small"
+                    label={u.role ? u.role.toUpperCase() : "USER"}
+                    variant="outlined"
+                  />
+                  <Chip
+                    size="small"
+                    label={u.is_active ? "Active" : "Inactive"}
+                    color={u.is_active ? "success" : "default"}
+                  />
+                </Stack>
                 <Typography variant="body2">{u.email}</Typography>
                 <Typography variant="caption">
                   {u.city || u.state
@@ -285,12 +346,25 @@ const UserMasterPage = () => {
                 </Typography>
               </Box>
               <Box>
-                <IconButton onClick={() => openEdit(u)}>
-                  <Edit />
-                </IconButton>
-                <IconButton onClick={() => handleDelete(u.id)}>
-                  <Delete />
-                </IconButton>
+                <Tooltip title="Edit">
+                  <IconButton onClick={() => openEdit(u)}>
+                    <Edit />
+                  </IconButton>
+                </Tooltip>
+
+                {u.is_active ? (
+                  <Tooltip title="Deactivate">
+                    <IconButton onClick={() => handleDeactivate(u.id)}>
+                      <Block />
+                    </IconButton>
+                  </Tooltip>
+                ) : (
+                  <Tooltip title="Activate">
+                    <IconButton onClick={() => handleActivate(u.id)}>
+                      <CheckCircle />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -313,6 +387,24 @@ const UserMasterPage = () => {
 
         <DialogContent>
           <Grid container spacing={2} mt={1}>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel id="user-type-label">User Type</InputLabel>
+                <Select
+                  labelId="user-type-label"
+                  label="User Type"
+                  name="userType"
+                  value={form.userType}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, userType: e.target.value }))
+                  }
+                >
+                  <MenuItem value="Admin User">Admin User</MenuItem>
+                  <MenuItem value="Normal User">Normal User</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
