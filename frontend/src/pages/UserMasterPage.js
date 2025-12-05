@@ -29,9 +29,8 @@ import { Country, State, City } from "country-state-city";
 import { validateUserForm } from "../utils/validation";
 import { useSearch } from "../context/SearchContext";
 
-
-const parseMobileString = (mobileStr, defaultCode = '+91') => {
-  if (!mobileStr) return { countryCode: defaultCode, mobile: '' };
+const parseMobileString = (mobileStr, defaultCode = "+91") => {
+  if (!mobileStr) return { countryCode: defaultCode, mobile: "" };
 
   const m = String(mobileStr).trim();
 
@@ -40,7 +39,7 @@ const parseMobileString = (mobileStr, defaultCode = '+91') => {
   if (match) {
     const code = match[1];
     // remove anything but digits from remaining part
-    const rest = (match[2] || '').replace(/\D/g, '');
+    const rest = (match[2] || "").replace(/\D/g, "");
     return { countryCode: code, mobile: rest };
   }
 
@@ -51,7 +50,7 @@ const parseMobileString = (mobileStr, defaultCode = '+91') => {
   }
 
   // 3) last resort: no country code found — strip non-digit and return default code
-  const digits = m.replace(/\D/g, '');
+  const digits = m.replace(/\D/g, "");
   return { countryCode: defaultCode, mobile: digits };
 };
 const thumbnail = "/mnt/data/a04fb529-dace-41cc-9324-c196588840b9.png";
@@ -233,7 +232,7 @@ const UserMasterPage = () => {
       setErrors(validationErrors);
       return;
     }
-    const mobileDigits = (form.mobile || '').toString().replace(/\D/g, '');
+    const mobileDigits = (form.mobile || "").toString().replace(/\D/g, "");
 
     const payload = {
       userId: form.userId.trim(),
@@ -345,27 +344,51 @@ const UserMasterPage = () => {
                     : ""}
                 </Typography>
               </Box>
-              <Box>
-                <Tooltip title="Edit">
-                  <IconButton onClick={() => openEdit(u)}>
-                    <Edit />
-                  </IconButton>
-                </Tooltip>
+              {u.role.toLowerCase() !== "admin" ? (
+                <Box>
+                  <Tooltip title="Edit">
+                    <IconButton onClick={() => openEdit(u)}>
+                      <Edit />
+                    </IconButton>
+                  </Tooltip>
 
-                {u.is_active ? (
-                  <Tooltip title="Deactivate">
-                    <IconButton onClick={() => handleDeactivate(u.id)}>
-                      <Block />
+                  {u.is_active ? (
+                    <Tooltip title="Deactivate">
+                      <IconButton onClick={() => handleDeactivate(u.id)}>
+                        <Block />
+                      </IconButton>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip title="Activate">
+                      <IconButton onClick={() => handleActivate(u.id)}>
+                        <CheckCircle />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
+              ) : (
+                <Box>
+                  <Tooltip title="Edit">
+                    <IconButton>
+                      <Edit color="disabled"/>
                     </IconButton>
                   </Tooltip>
-                ) : (
-                  <Tooltip title="Activate">
-                    <IconButton onClick={() => handleActivate(u.id)}>
-                      <CheckCircle />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
+
+                  {u.is_active ? (
+                    <Tooltip title="Deactivate">
+                      <IconButton >
+                        <Block color="disabled"/>
+                      </IconButton>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip title="Activate">
+                      <IconButton onClick={() => handleActivate(u.id)}>
+                        <CheckCircle />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
+              )}
             </Paper>
           </Grid>
         ))}
