@@ -26,6 +26,7 @@ const LoginPage = () => {
 
     try {
       const data = await authApi.login(form);
+      // console.log("Login Response Data:", data);
       login(data.user, data.token);
       navigate("/");
     } catch (err) {

@@ -41,9 +41,9 @@ const Sidebar = ({ open, onToggle }) => {
 
   const userMenu = [
     { label: "Home", path: "/", icon: <HomeIcon /> },
-    { label: "Profile", path: "/profile", icon: <PersonIcon /> },
-    { label: "Orders", path: "/orders", icon: <ReceiptIcon /> },
-    { label: "Support", path: "/support", icon: <HelpOutlineIcon /> },
+    { label: "Profile", path: "/dummy1", icon: <PersonIcon /> },
+    { label: "Orders", path: "/dummy2", icon: <ReceiptIcon /> },
+    { label: "Support", path: "/dummy3", icon: <HelpOutlineIcon /> },
   ];
 
   const menu = isAdmin ? adminMenu : userMenu;

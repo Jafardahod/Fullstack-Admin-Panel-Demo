@@ -285,6 +285,8 @@ const UserMasterPage = () => {
       const msg = resp?.message || "Failed to save user";
       alert(msg);
     }
+    const expiryTime = Date.now() + 1000 * 60 * 60;
+    localStorage.setItem("expiry", expiryTime);
   };
 
   return (
@@ -370,14 +372,14 @@ const UserMasterPage = () => {
                 <Box>
                   <Tooltip title="Edit">
                     <IconButton>
-                      <Edit color="disabled"/>
+                      <Edit color="disabled" />
                     </IconButton>
                   </Tooltip>
 
                   {u.is_active ? (
                     <Tooltip title="Deactivate">
-                      <IconButton >
-                        <Block color="disabled"/>
+                      <IconButton>
+                        <Block color="disabled" />
                       </IconButton>
                     </Tooltip>
                   ) : (

@@ -127,6 +127,8 @@ const ItemMasterPage = () => {
       const msg = resp?.message || "Failed to save item";
       alert(msg);
     }
+    const expiryTime = Date.now() + 1000 * 60 * 60;
+    localStorage.setItem("expiry", expiryTime);
   };
 
   return (
@@ -193,7 +195,12 @@ const ItemMasterPage = () => {
         )}
       </Grid>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>{editingId ? "Edit Item" : "Add Item"}</DialogTitle>
         <DialogContent>
           <TextField
